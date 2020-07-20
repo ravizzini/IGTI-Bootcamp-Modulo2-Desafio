@@ -5,9 +5,9 @@ import { promises } from 'fs';
 
 //import cors from 'cors';
 
-//criação de variavel para uso de promises evita repetição de escrita toda vez que for usar promises
-
 const router = express.Router(); //cria objeto router para substituir app uma vez que todos endpoint respondem na mesma url
+
+//criação de variavel para uso de promises evita repetição de escrita toda vez que for usar promises
 const readFile = promises.readFile;
 const writeFile = promises.writeFile;
 
@@ -46,7 +46,6 @@ router.post('/createGrade', async (req, res) => {
 
 router.put('/updateGrade', async (req, res) => {
   try {
-    //pegar parametros que estão sendo enviados
     let newGrade = req.body;
 
     let data = await readFile(global.fileName, 'utf8');
@@ -79,14 +78,11 @@ router.delete('/deleteGrade/:id', async (req, res) => {
   try {
     let data = await readFile(global.fileName, 'utf8');
 
-    // criando variavel json para responder data usando a conversão parse e remover o next id com delete json.nextID
-
     let json = JSON.parse(data);
-    //é possivel inserir um tratamento de erro aqui caso não exista o id no array
 
     let grades = json.grades.filter(
       (grade) => grade.id !== parseInt(req.params.id, 10) // parseInt usado para converter string para inteiro
-    ); //usar o metodo filter para localizar o objeto com id fornecido no array grades e remover retornando o array sem o objeto
+    );
 
     json.grades = grades; // troca o array com todos os registros pelo novo array
 
@@ -111,11 +107,10 @@ router.get('/getById/:id', async (req, res) => {
   try {
     let data = await readFile(global.fileName, 'utf8');
 
-    // criando variavel json para responder data usando a conversão parse e remover o next id com delete json.nextID
     let json = JSON.parse(data);
     const grade = json.grades.find(
       (grade) => grade.id === parseInt(req.params.id, 10) // parseInt usado para converter string para inteiro
-    ); //usar o metodo find para localizar o objeto com id fornecido no array accounts
+    ); //usar o metodo find para localizar o objeto com id fornecido no array grades
 
     if (grade) {
       res.send(`${JSON.stringify(grade)}`);
@@ -132,41 +127,115 @@ router.get('/getById/:id', async (req, res) => {
   }
 });
 
-// router.post('/transaction', async (req, res) => {
-//   //pegar parametros que estão sendo enviados
+//5. Crie um endpoint para consultar a nota total de um aluno em uma disciplina.
+router.post('/subjectResult', async (req, res) => {
+  try {
+    let data = await readFile(global.fileName, 'utf8');
 
-//   try {
-//     let params = req.body;
+    let json = JSON.parse(data);
 
-//     let data = await readFile(global.fileName, 'utf8');
+    const params = req.body;
 
-//     // let json = JSON.parse(data); //Lê a informação do arquivo
+    const results = json.grades.filter(
+      (grade) =>
+        grade.student === params.student && grade.subject === params.subject
+    );
 
-//     let json = JSON.parse(data);
-//     let index = json.accounts.findIndex((account) => account.id === params.id);
+    const resultsSum = results.reduce((accumulator, currentItem) => {
+      return accumulator + currentItem.value;
+    }, 0);
 
-//     //método dinfIndex encontra o índice anterior ao registro que desejamos alterar
+    res.status(200).send(`Nota Final subject ${params.subject}: ${resultsSum}`);
+  } catch (error) {
+    res.status(400).send({ error: error.message });
+    logger.error(`POST /grade/subjectResult -${err.message}`);
+  }
+});
 
-//     // prettier-ignore
-//     if ((params.value < 0) && ((json.accounts[index].balance + params.value) < 0)) {
-//         throw new Error("Não há saldo suficiente.");
-//       }
+//6. Crie um endpoint para consultar a média das grades de determinado subject e type
 
-//     json.accounts[index].balance += params.value;
+router.post('/gradeAverage', async (req, res) => {
+  try {
+    let data = await readFile(global.fileName, 'utf8');
 
-//     await writeFile(global.fileName, JSON.stringify(json));
+    let json = JSON.parse(data);
 
-//     res.send(json.accounts[index]);
-//     //res.end(); // retorna status 200
-//     logger.info(`POST /account/transaction - ${JSON.stringify(params)}`);
-//   } catch (err) {
-//     res.status(400).send({ error: err.message });
+    const params = req.body;
 
-//     logger.error(`POST /account/transaction -${err.message}`);
-//   }
-// });
+    const results = json.grades.filter(
+      (grade) => grade.subject === params.subject && grade.type === params.type
+    );
 
-//extra
+    if (!results.length) {
+      throw new Erros(
+        'Não foram encontrados registros para os parametros informados'
+      );
+    }
+
+    const resultsSum = results.reduce((accumulator, currentItem) => {
+      return accumulator + currentItem.value;
+    }, 0);
+
+    const average = resultsSum / results.length;
+
+    console.log(average);
+
+    res
+      .status(200)
+      .send(
+        `Média dos resultados do subject ${params.subject} e type ${params.type}: ${average}`
+      );
+  } catch (error) {
+    res.status(400).send({ error: error.message });
+    logger.error(`POST /grade/subjectResult -${err.message}`);
+  }
+});
+
+//7. Crie um endpoint para retornar as três melhores grades de acordo com determinado subject e type.
+
+router.post('/top3Grades', async (req, res) => {
+  try {
+    let data = await readFile(global.fileName, 'utf8');
+
+    let json = JSON.parse(data);
+
+    const params = req.body;
+
+    const results = json.grades.filter(
+      (grade) => grade.subject === params.subject && grade.type === params.type
+    );
+
+    if (!results.length) {
+      throw new Erros(
+        'Não foram encontrados registros para os parametros informados'
+      );
+    }
+
+    results.sort((a, b) => {
+      if (a.value < b.value) return 1;
+      else if (a.value > b.value) return -1;
+      else return 0;
+    });
+
+    const top3 = [];
+    results
+      .slice(0, 3)
+      .forEach((item) =>
+        top3.push(item.id + ' ' + item.student + ' - ' + item.value)
+      );
+
+    res
+      .status(200)
+      .send(
+        `Melhores 3 grades do subject ${params.subject} e type ${params.type}: ${top3}`
+      );
+  } catch (error) {
+    res.status(400).send({ error: error.message });
+    logger.error(`POST /grade/subjectResult -${err.message}`);
+  }
+});
+
+//extra métodos retorna todos as grades do arquivo grades.json
 router.get('/', async (_, res) => {
   try {
     //ler o arquivo
@@ -185,4 +254,4 @@ router.get('/', async (_, res) => {
   }
 });
 
-export default router; //pesquisar outras formar de exportar variaveis. Aqui exportamos o modulo inteiro.
+export default router;
