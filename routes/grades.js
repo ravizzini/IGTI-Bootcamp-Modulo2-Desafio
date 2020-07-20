@@ -238,7 +238,6 @@ router.post('/top3Grades', async (req, res) => {
 //extra métodos retorna todos as grades do arquivo grades.json
 router.get('/', async (_, res) => {
   try {
-    //ler o arquivo
     let data = await readFile(global.fileName, 'utf8');
 
     let json = JSON.parse(data);
