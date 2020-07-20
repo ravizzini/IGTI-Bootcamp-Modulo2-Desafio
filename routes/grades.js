@@ -241,7 +241,6 @@ router.get('/', async (_, res) => {
     //ler o arquivo
     let data = await readFile(global.fileName, 'utf8');
 
-    // criando variavel json para responder data usando a conversão parse e remover o next id com delete json.nextID
     let json = JSON.parse(data);
     delete json.nextId;
     res.send(json);
